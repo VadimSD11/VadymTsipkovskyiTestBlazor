@@ -13,7 +13,6 @@
 <EditForm Model="@formData" OnValidSubmit="UploadFile">
     <InputFile OnChange="HandleFileUpload" accept=".docx" />
 
-    <!-- Add an email input field with custom validation -->
     <div>
         <label for="recipientEmail">Enter your email:</label>
         <InputText id="recipientEmail" @bind-Value="formData.RecipientEmail" />
@@ -64,8 +63,8 @@
                 await blobClient.UploadAsync(stream, true);
             }
 
-            // Call the Azure Function to send an email
-            var functionUrl = "https://functionapp220230911183131.azurewebsites.net/"; // Replace with your Azure Function URL
+            
+            var functionUrl = "https://functionapp220230911183131.azurewebsites.net/"; 
 
             // Create an object to send as JSON payload
             var emailData = new { recipientEmail = formData.RecipientEmail, name = selectedFile.Name };
@@ -78,7 +77,6 @@
                 var response = await httpClient.PostAsync(functionUrl, requestContent);
                 if (response.IsSuccessStatusCode)
                 {
-                    // Optionally, provide a link to the uploaded file
                     var blobUri = blobClient.Uri.ToString();
                     await JSRuntime.InvokeVoidAsync("alert", $"File uploaded successfully. Blob URI: {blobUri}");
                 }
