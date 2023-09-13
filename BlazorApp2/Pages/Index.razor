@@ -1,0 +1,113 @@
+﻿@page "/"
+
+@using System.Text;
+@using Azure.Storage.Blobs;
+@using Microsoft.AspNetCore.Components.Forms
+@using System.ComponentModel.DataAnnotations
+@inject IJSRuntime JSRuntime
+@using Newtonsoft.Json;
+
+
+<h3>Upload a DOC File</h3>
+
+<EditForm Model="@formData" OnValidSubmit="UploadFile">
+    <InputFile OnChange="HandleFileUpload" accept=".docx" />
+
+    <!-- Add an email input field with custom validation -->
+    <div>
+        <label for="recipientEmail">Enter your email:</label>
+        <InputText id="recipientEmail" @bind-Value="formData.RecipientEmail" />
+        <ValidationMessage For="() => formData.RecipientEmail" />
+    </div>
+
+    <button type="submit">Upload</button>
+</EditForm>
+
+
+@code {
+    private IBrowserFile selectedFile;
+    private string connectionString = "DefaultEndpointsProtocol=https;AccountName=vadymtsipkovskyinettest;AccountKey=n0HHuJITXNc+nm1qYIBUUie8car67fEY62hpHsIQeYNy3uaOHATh5JKzRM9NNksjhk/RAQaa9+Ro+AStQxI5GA==;EndpointSuffix=core.windows.net";
+    private string containerName = "vadymtsipkovskyinettest";
+
+    private FormData formData = new FormData();
+
+    private async Task HandleFileUpload(InputFileChangeEventArgs e)
+    {
+        selectedFile = e.File;
+    }
+
+    private async Task UploadFile()
+    {
+        if (selectedFile != null)
+        {
+            // Check if the selected file has a valid extension (.docx)
+            if (!selectedFile.Name.EndsWith(".docx", StringComparison.OrdinalIgnoreCase))
+            {
+                await JSRuntime.InvokeVoidAsync("alert", "Invalid file type. Please upload a DOCX file.");
+                return;
+            }
+
+            // Validate the email
+            if (!IsValidEmail(formData.RecipientEmail))
+            {
+                await JSRuntime.InvokeVoidAsync("alert", "Invalid email address. Please enter a valid email.");
+                return;
+            }
+
+            // Upload the file to Azure BLOB storage
+            var blobServiceClient = new BlobServiceClient(connectionString);
+            var blobContainerClient = blobServiceClient.GetBlobContainerClient(containerName);
+            var blobClient = blobContainerClient.GetBlobClient(selectedFile.Name);
+
+            using (var stream = selectedFile.OpenReadStream())
+            {
+                await blobClient.UploadAsync(stream, true);
+            }
+
+            // Call the Azure Function to send an email
+            var functionUrl = "https://functionapp220230911183131.azurewebsites.net/"; // Replace with your Azure Function URL
+
+            // Create an object to send as JSON payload
+            var emailData = new { recipientEmail = formData.RecipientEmail, name = selectedFile.Name };
+            var requestContent = new StringContent(JsonConvert.SerializeObject(emailData), Encoding.UTF8, "application/json");
+
+            using (var httpClient = new HttpClient())
+            {
+                functionUrl += $"?recipientEmail={formData.RecipientEmail}";
+
+                var response = await httpClient.PostAsync(functionUrl, requestContent);
+                if (response.IsSuccessStatusCode)
+                {
+                    // Optionally, provide a link to the uploaded file
+                    var blobUri = blobClient.Uri.ToString();
+                    await JSRuntime.InvokeVoidAsync("alert", $"File uploaded successfully. Blob URI: {blobUri}");
+                }
+                else
+                {
+                    // Handle the case where the Azure Function call fails
+                    await JSRuntime.InvokeVoidAsync("alert", $"Error: {response.StatusCode}");
+                }
+            }
+        }
+    }
+
+    private bool IsValidEmail(string email)
+    {
+        try
+        {
+            var emailAddress = new System.Net.Mail.MailAddress(email);
+            return emailAddress.Address == email;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private class FormData
+    {
+        [Required(ErrorMessage = "Email is required.")]
+        [EmailAddress(ErrorMessage = "Invalid email format.")]
+        public string RecipientEmail { get; set; }
+    }
+}
