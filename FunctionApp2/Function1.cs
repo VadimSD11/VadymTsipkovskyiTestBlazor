@@ -63,7 +63,7 @@ namespace FunctionApp2
             await smtpClient.SendMailAsync(message);
         }
 
-        private static string GenerateSasToken(string blobUri)
+        public static string GenerateSasToken(string blobUri)
         {
             // Parse the blob URI
             var blobUriBuilder = new UriBuilder(blobUri);
