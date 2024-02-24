@@ -1,6 +1,12 @@
 ﻿@page "/"
-
+@using System.Net.Mail;
 @using System.Text;
+@using System.Net;
+@using System.IO;
+@using System;
+@using Azure.Storage.Sas;
+@using Azure.Storage;
+@using Microsoft.Azure.WebJobs;
 @using Azure.Storage.Blobs;
 @using Microsoft.AspNetCore.Components.Forms
 @using System.ComponentModel.DataAnnotations
@@ -63,14 +69,16 @@
             {
                 await blobClient.UploadAsync(stream, true);
             }
+          //  var blobUriWithSasToken = GenerateSasToken(blobClient.Uri);
 
             // Call the Azure Function to send an email
-            var functionUrl = "https://functionapp220230911183131.azurewebsites.net/"; // Replace with your Azure Function URL
+            var functionUrl = "https://functionapp220240224172622.azurewebsites.net/api/Function1";
 
             // Create an object to send as JSON payload
-            var emailData = new { recipientEmail = formData.RecipientEmail, name = selectedFile.Name };
+            var emailData = new { recipientEmail = formData.RecipientEmail, name = selectedFile.Name, blobUri = blobClient.Uri.ToString() };
             var requestContent = new StringContent(JsonConvert.SerializeObject(emailData), Encoding.UTF8, "application/json");
 
+            
             using (var httpClient = new HttpClient())
             {
                 functionUrl += $"?recipientEmail={formData.RecipientEmail}";
@@ -81,6 +89,7 @@
                     // Optionally, provide a link to the uploaded file
                     var blobUri = blobClient.Uri.ToString();
                     await JSRuntime.InvokeVoidAsync("alert", $"File uploaded successfully. Blob URI: {blobUri}");
+                    
                 }
                 else
                 {
@@ -90,7 +99,24 @@
             }
         }
     }
+        //    private string GenerateSasToken(Uri blobUri)
+        //{
+        //    // Create blob client with SAS token
+        //    var blobSasBuilder = new BlobSasBuilder()
+        //    {
+        //        BlobContainerName = containerName,
+        //        BlobName = blobUri.Segments.Last(),
+        //        Resource = "b",
+        //        ExpiresOn = DateTimeOffset.UtcNow.AddHours(1),
+        //        Protocol = SasProtocol.Https
+        //    };
+    
+        //    blobSasBuilder.SetPermissions(BlobContainerSasPermissions.Read); // Adjust permissions as needed
 
+        //var sasToken = blobSasBuilder.ToSasQueryParameters(new StorageSharedKeyCredential("vadymtsipkovskyinettest", "n0HHuJITXNc+nm1qYIBUUie8car67fEY62hpHsIQeYNy3uaOHATh5JKzRM9NNksjhk/RAQaa9+Ro+AStQxI5GA==")).ToString();
+        
+        //    return $"{blobUri}?{sasToken}";
+        //}
     private bool IsValidEmail(string email)
     {
         try
